@@ -15,6 +15,8 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,7 +47,12 @@ public class ClassUtils {
         List<ColumnType> list=new ArrayList<>();
         String fieldName;
         ColumnType columnType;
+        Method setIdMethod=null;
         for(Method method:methods){
+            //获取ID列的set方法
+            if (method.getName().startsWith("set")&&
+                    method.getName().substring(3).equalsIgnoreCase(idField.getName()))
+                setIdMethod=method;
             //如果结果中没有改field项则跳过
             if (method.getName().startsWith("get")) {
                 fieldName = method.getName().substring(3);
@@ -68,6 +75,15 @@ public class ClassUtils {
             }
             list.add(columnType);
         }
+        if (setIdMethod!=null)
+            try {
+            //设置ID属性值
+                setIdMethod.invoke(object,sequenceValue);
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            } catch (InvocationTargetException e) {
+                e.printStackTrace();
+            }
         return list;
     }
 
@@ -77,6 +93,9 @@ public class ClassUtils {
     public  static String getTableName(Class clazz){
         Table table=(Table)clazz.getAnnotation(Table.class);
         return  (table!=null&&table.name()!=null)?table.name():clazz.getName();
+    }
+    public static Method getSetMethodByFieldName(Class clazz,String fieldName,Class... paramTpes) throws  NoSuchMethodException{
+        return clazz.getDeclaredMethod("set"+fieldName.substring(3),paramTpes);
     }
     /**
      * 获取主键sequence名称
@@ -133,4 +152,97 @@ public class ClassUtils {
                 getAllColumn(object),isIncludeNull);
     }
 
+    /**
+     * PreparedStatement 填充参数
+     * @param ps
+     * @param args
+     */
+    public  static void prepareStatement(PreparedStatement ps,List<Object> args){
+        int i=1;
+        for (Object object:args){
+            try {
+                if (object==null){
+                    ps.setObject(i++,null);
+                    continue;
+                }
+                Class c=object.getClass();
+                if(c.equals(Blob.class)){//如果接收参数是blob类型
+                    ps.setBlob(i++,(Blob)object);
+                }else if(c.equals(Clob.class)){
+                    ps.setClob(i++,(Clob)object);
+                }else if(c.equals(java.sql.Time.class)){
+                    ps.setTime(i++,(Time) object);
+                }else if(c.equals(java.sql.Date.class)){
+                    ps.setDate(i++,(Date) object);
+                }else if(c.equals(java.sql.Timestamp.class)){
+                    ps.setTimestamp(i++,(java.sql.Timestamp)object);
+                }else if(c.equals(java.util.Date.class)){
+                    java.util.Date date=(java.util.Date)object;
+                    ps.setDate(i++,new java.sql.Date(date.getTime()));
+                }else if(c.equals(BigDecimal.class)){
+                    ps.setBigDecimal(i++,(BigDecimal)object);
+                }else if(c.equals(int.class)||c.equals(Integer.class)){
+                    ps.setInt(i++,(Integer) object);
+                    //long
+                }else if(c.equals(long.class)||c.equals(Long.class)){
+                    ps.setLong(i++,(Long) object);
+                    //short
+                }else if(c.equals(short.class)||c.equals(Short.class)){
+                    ps.setShort(i++,(Short) object);
+                    //float
+                }else if(c.equals(float.class)||c.equals(Float.class)){
+                    ps.setFloat(i++,(Float) object);
+                    //double
+                }else if(c.equals(double.class)||c.equals(Double.class)){
+                    ps.setDouble(i++,(Double) object);
+                    //String
+                }else if(c.equals(String.class)){
+                    ps.setString(i++,(String) object);
+                    //boolean
+                }else if(c.equals(Boolean.class)){
+                    ps.setBoolean(i++,(Boolean) object);
+                }else {
+                    throw  new RuntimeException("无效的列类型"+c.getClass().getName());
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * 设置对象主键值
+     * @param object
+     * @param idValue
+     */
+    public static void setIDValue(Object object,Long idValue){
+        Field idField=getIdColumn(object.getClass());
+        Method method= getSetMethod(object.getClass(),idField);
+        try {
+            if (idField.getType().equals(Long.class))
+                method.invoke(object,idField)  ;
+            else
+                method.invoke(object,idValue.intValue())  ;
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     *
+     * @return
+     */
+    public static  Method getSetMethod(Class clazz,Field field) {
+        String fieldName=field.getName();
+        Method method=null;
+        try {
+            method=  clazz.getDeclaredMethod("set"+fieldName.substring(0,1).toUpperCase()+fieldName.substring(1)
+                    ,new Class[]{field.getType()});
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        }
+        return method;
+    }
 }

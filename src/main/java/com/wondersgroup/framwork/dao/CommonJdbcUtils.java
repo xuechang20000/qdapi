@@ -151,4 +151,14 @@ public class CommonJdbcUtils {
     public static Long getSequence(String sequenceName){
         return  commonJdbcDao.getSequence(sequenceName);
     }
+
+    /**
+     * sql执行
+     * @param sql
+     * @param args
+     * @return
+     */
+    public int execute(String sql,Object...args){
+        return commonJdbcDao.execute(sql,args);
+    }
 }

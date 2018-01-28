@@ -22,4 +22,5 @@ public interface CommonJdbcDao {
     public void updateSelect(Object object);
     public void insert(Object object);
     public Long getSequence(String sequenceName);
+    public int execute(String sql,Object...args);
 }

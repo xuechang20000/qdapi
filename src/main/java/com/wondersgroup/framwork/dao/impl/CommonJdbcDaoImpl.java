@@ -11,14 +11,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.datasource.DataSourceUtils;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -215,14 +216,27 @@ public class CommonJdbcDaoImpl implements CommonJdbcDao {
      * @param list
      */
     public <T> void insertBatchBySelect(List<T> list){
-        this.updateBatchObjects(list,"INSERT",false);
+        if ("MySQL".equalsIgnoreCase(databaseProductName)){
+            for (T t:list){
+                insertObject(t,false);
+            }
+        }else {
+            this.updateBatchObjects(list,"INSERT",false);
+        }
     }
     /**
      * 批量插入对象,插入所有字段
      * @param list
      */
     public <T> void insertBatch(List<T> list){
-        this.updateBatchObjects(list,"INSERT",true);
+        if ("MySQL".equalsIgnoreCase(databaseProductName)){
+            for (T t:list){
+              insertObject(t,true);
+            }
+        }else {
+            this.updateBatchObjects(list,"INSERT",true);
+        }
+
     }
     /**
      * 更新对象
@@ -241,10 +255,26 @@ public class CommonJdbcDaoImpl implements CommonJdbcDao {
      * @param isIncludeNull 是否包括空值
      */
     public void insertObject(Object object,boolean isIncludeNull){
-        SqlCreator sqlCreator=ClassUtils.getSqlCreator(object,isIncludeNull);
+        final SqlCreator sqlCreator=ClassUtils.getSqlCreator(object,isIncludeNull);
         sqlCreator.generateInsertSql();
-        this.jdbcTemplate.update(sqlCreator.getSql(),
-                sqlCreator.getArgs().toArray());
+        if ("MySQL".equalsIgnoreCase(databaseProductName)){
+            KeyHolder keyHolder = new GeneratedKeyHolder();
+            this.jdbcTemplate.update(new PreparedStatementCreator() {
+                @Override
+                public PreparedStatement createPreparedStatement(Connection connection) throws SQLException {
+                    PreparedStatement ps=connection.prepareStatement(sqlCreator.getSql(), Statement.RETURN_GENERATED_KEYS);
+                    ClassUtils.prepareStatement(ps,sqlCreator.getArgs());
+                    return ps;
+                }
+            },keyHolder);
+            //回写主键值
+            ClassUtils.setIDValue(object,keyHolder.getKey().longValue());
+        }else {
+            this.jdbcTemplate.update(sqlCreator.getSql(),
+               sqlCreator.getArgs().toArray());
+        }
+
+
     }
     /**
      * 更新对象所有值包括空值
@@ -277,4 +307,13 @@ public class CommonJdbcDaoImpl implements CommonJdbcDao {
         return  this.queryObject("select "+sequenceName+".nextval from dual",Long.class);
     }
 
+    /**
+     * sql执行
+     * @param sql
+     * @param args
+     * @return
+     */
+    public int execute(String sql,Object...args){
+        return  this.jdbcTemplate.update(sql,args);
+    }
 }

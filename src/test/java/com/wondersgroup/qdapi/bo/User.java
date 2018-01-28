@@ -8,7 +8,7 @@ import java.util.Date;
 @Table(name="test")
 public class User {
     @Id
-    private int id;
+    private Integer id;
     private String name;
     private Integer age;
     private Date time;
@@ -29,11 +29,11 @@ public class User {
         this.time = time;
     }
 
-    public int getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

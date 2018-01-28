@@ -50,6 +50,7 @@ public class QdapiApplicationTests {
 		user.setAge(30);
 		user.setTime(new Date());
 		CommonJdbcUtils.insert(user);
+		System.out.println(JSON.toJSON(user));
 	}
 	@Test
 	public void contextLoads_update() {
@@ -66,10 +67,10 @@ public class QdapiApplicationTests {
 		User user=null;
 		for (int i=0;i<10;i++) {
 			user=new User();
-			user.setName("薛xue"+(i+6));
-			user.setId(i+6);
+			user.setName("薛凤彪xue"+(i+6));
 			users.add(user);
 		}
-		CommonJdbcUtils.updateBatchBySelect(users);
+		CommonJdbcUtils.insertBatch(users);
+		System.out.println("-----"+JSON.toJSONString(users));
 	}
 }
