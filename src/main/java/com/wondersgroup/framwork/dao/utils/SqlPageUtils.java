@@ -13,7 +13,7 @@ public class SqlPageUtils  {
      */
     public static String handlerPagingSQL(String sql, String dbType) {
         if (null==sql||sql.trim().length()==0) return null;
-        if(dbType.equals( DataBaseType.ORACLE)) return handlerOraclePaginSql(sql);
+        if(dbType.equalsIgnoreCase( DataBaseType.ORACLE)) return handlerOraclePaginSql(sql);
         return sql+" limit ?,?";
     }
 

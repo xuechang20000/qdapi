@@ -2,10 +2,19 @@ package com.wondersgroup.framwork.dao.bo;
 
 public class ColumnType {
     private String columnName;
-    private boolean isNull;
-
+    private Object value;
     public  ColumnType(){
 
+    }
+    public  ColumnType(String columnName,Object object){
+        this.columnName=columnName;
+        this.value=object;
+    }
+    public void setValue(Object value) {
+        this.value = value;
+    }
+    public Object getValue() {
+        return value;
     }
     public ColumnType(String columnName){
         this.columnName=columnName;
@@ -18,11 +27,4 @@ public class ColumnType {
         this.columnName = columnName;
     }
 
-    public boolean isNull() {
-        return isNull;
-    }
-
-    public void setNull(boolean aNull) {
-        isNull = aNull;
-    }
 }

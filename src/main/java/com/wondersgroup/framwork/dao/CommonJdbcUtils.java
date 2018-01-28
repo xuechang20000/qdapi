@@ -1,12 +1,10 @@
 package com.wondersgroup.framwork.dao;
 
 import com.wondersgroup.framwork.dao.bo.Page;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
-import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
 
@@ -98,5 +96,59 @@ public class CommonJdbcUtils {
      */
     public static Map<String,Object> queryMap(String sql, Object...arguments){
         return commonJdbcDao.queryMap(sql,arguments);
+    }
+    /**
+     * 批量更新对象,只更新非空字段
+     * @param list
+     */
+    public static <T> void updateBatchBySelect(List<T> list){
+       commonJdbcDao.updateBatchBySelect(list);
+    }
+    /**
+     * 批量更新对象，更新所有字段
+     * @param list
+     */
+    public static <T> void updateBatch(List<T> list){
+       commonJdbcDao.updateBatch(list);
+    }
+    public static void update(Object object){
+        commonJdbcDao.update(object);
+    }
+    /**
+     * 更新对象，不包括空值
+     * @param object 对象
+     */
+    public static void updateSelect(Object object){
+       commonJdbcDao.updateSelect(object);
+    }
+    /**
+     * 插入对象所有值包括空值
+     * @param object 对象
+     */
+    public static void insert(Object object){
+        commonJdbcDao.insert(object);
+    }
+    /**
+     * 批量插入对象,只更新非空字段
+     * @param list
+     */
+    public static <T> void insertBatchBySelect(List<T> list){
+        commonJdbcDao.insertBatchBySelect(list);
+    }
+    /**
+     * 批量插入对象,插入所有字段
+     * @param list
+     */
+    public static <T> void insertBatch(List<T> list){
+        commonJdbcDao.insertBatch(list);
+    }
+
+    /**
+     * 获取sequence值
+     * @param sequenceName
+     * @return
+     */
+    public static Long getSequence(String sequenceName){
+        return  commonJdbcDao.getSequence(sequenceName);
     }
 }
