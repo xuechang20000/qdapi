@@ -1,13 +1,13 @@
 package com.wondersgroup.qdapi.bo;
 
 import com.wondersgroup.framwork.dao.annotation.Id;
+import com.wondersgroup.framwork.dao.annotation.Sequence;
 import com.wondersgroup.framwork.dao.annotation.Table;
 
 import java.util.Date;
 
-@Table(name="test")
+@Table(name="test_xue")
 public class User {
-    @Id
     private Integer id;
     private String name;
     private Integer age;
@@ -29,6 +29,8 @@ public class User {
         this.time = time;
     }
 
+    @Id
+    @Sequence(sequencename = "seq_id")
     public Integer getId() {
         return id;
     }

@@ -5,11 +5,13 @@ import com.wondersgroup.framwork.dao.bo.DataBaseType;
 import com.wondersgroup.framwork.dao.bo.Page;
 import com.wondersgroup.framwork.dao.bo.SqlCreator;
 import com.wondersgroup.framwork.dao.mapper.ObjectRowMapper;
+import com.wondersgroup.framwork.dao.mapper.SimpleBatchPreparedStatementSetter;
 import com.wondersgroup.framwork.dao.utils.ClassUtils;
 import com.wondersgroup.framwork.dao.utils.SqlPageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.datasource.DataSourceUtils;
@@ -185,31 +187,24 @@ public class CommonJdbcDaoImpl implements CommonJdbcDao {
      */
     public <T> void updateBatchObjects(List<T> list,String insertOrUpdate, boolean isIncludeNull){
         if (list==null||list.size()==0) return;
-        List<Object[]> args=new ArrayList<Object[]>();
-        SqlCreator sqlCreator=null;
-        for (T t:list){
-            sqlCreator=ClassUtils.getSqlCreator(t,isIncludeNull);
-            if ("INSERT".equalsIgnoreCase(insertOrUpdate))
-                sqlCreator.generateInsertSql();
-            else
-                sqlCreator.generateUpdateSql();
-            args.add(sqlCreator.getArgs().toArray());
-        }
-        this.jdbcTemplate.batchUpdate(sqlCreator.getSql(),args);
+
+        SimpleBatchPreparedStatementSetter simpleBatchPreparedStatementSetter
+                =new SimpleBatchPreparedStatementSetter(list,isIncludeNull,insertOrUpdate);
+        this.jdbcTemplate.batchUpdate(simpleBatchPreparedStatementSetter.getSql(),simpleBatchPreparedStatementSetter);
     }
     /**
      * 批量更新对象，更新所有字段
      * @param list
      */
     public <T> void updateBatch(List<T> list){
-        this.updateBatchObjects(list,"UPDATE",true);
+        this.updateBatchObjects(list,"update",true);
     }
     /**
      * 批量更新对象,只更新非空字段
      * @param list
      */
     public <T>void updateBatchBySelect(List<T> list){
-        this.updateBatchObjects(list,"UPDATE",false);
+        this.updateBatchObjects(list,"update",false);
     }
     /**
      * 批量插入对象,只更新非空字段
@@ -221,7 +216,7 @@ public class CommonJdbcDaoImpl implements CommonJdbcDao {
                 insertObject(t,false);
             }
         }else {
-            this.updateBatchObjects(list,"INSERT",false);
+            this.updateBatchObjects(list,"insert",false);
         }
     }
     /**
@@ -234,7 +229,7 @@ public class CommonJdbcDaoImpl implements CommonJdbcDao {
               insertObject(t,true);
             }
         }else {
-            this.updateBatchObjects(list,"INSERT",true);
+            this.updateBatchObjects(list,"insert",true);
         }
 
     }

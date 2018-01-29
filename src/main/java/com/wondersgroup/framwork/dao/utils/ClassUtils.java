@@ -18,7 +18,9 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ClassUtils {
     private final static Logger logger = LoggerFactory.getLogger(ObjectRowMapper.class);
@@ -39,52 +41,52 @@ public class ClassUtils {
      * @param object
      * @return
      */
-    public static List<ColumnType> getAllColumn(Object object){
+    public static  Map<String,Object> getAllColumn(Object object){
         Class c=object.getClass();
         Method[] methods = c.getDeclaredMethods();
-        Field idField=getIdColumn(c);
-        Long sequenceValue=getSequenceValue(c);
-        List<ColumnType> list=new ArrayList<>();
-        String fieldName;
-        ColumnType columnType;
+        Map<String,Object> columnsMap=new HashMap<String,Object>();
+
+        Method getIdMethod=getIdMethod(c);//id的get方法
         Method setIdMethod=null;
         for(Method method:methods){
-            //获取ID列的set方法
-            if (method.getName().startsWith("set")&&
-                    method.getName().substring(3).equalsIgnoreCase(idField.getName()))
-                setIdMethod=method;
             //如果结果中没有改field项则跳过
-            if (method.getName().startsWith("get")) {
-                fieldName = method.getName().substring(3);
-            } else {
+            if (!method.getName().startsWith("get")) {
                 continue;
             }
-            columnType=new ColumnType();
-            columnType.setColumnName(fieldName);
             try {
-                if (fieldName.equalsIgnoreCase(idField.getName())&&sequenceValue!=null){
-                    columnType.setValue(sequenceValue);
-                }else {
-                    Object obj=method.invoke(object);
-                    columnType.setValue(obj);
+                if (method.getName().endsWith(getIdMethod.getName().substring(1))){///如果是ID列
+                    setIdMethod=getSetMethod(c,method);
                 }
+                Object obj=method.invoke(object);
+                columnsMap.put(method.getName().substring(3),obj);
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             } catch (InvocationTargetException e) {
                 e.printStackTrace();
             }
-            list.add(columnType);
         }
-        if (setIdMethod!=null)
+
             try {
-            //设置ID属性值
-                setIdMethod.invoke(object,sequenceValue);
+
+            //如果没有Id的set方法或者主健不为空，测不重置主键值
+                if (setIdMethod==null||getIdMethod.invoke(object)!=null)
+                    return  columnsMap;
+                Long sequenceValue=ClassUtils.getSequenceValue(c);
+                //设置ID属性值
+                if (getIdMethod.getReturnType().equals(Integer.class)){
+                    setIdMethod.invoke(object,sequenceValue.intValue());
+                    columnsMap.put(getIdMethod.getName().substring(3),sequenceValue.intValue());
+                }else{
+                    setIdMethod.invoke(object,sequenceValue);
+                    columnsMap.put(getIdMethod.getName().substring(3),sequenceValue);
+                }
+
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             } catch (InvocationTargetException e) {
                 e.printStackTrace();
             }
-        return list;
+        return columnsMap;
     }
 
     /**
@@ -101,8 +103,8 @@ public class ClassUtils {
      * 获取主键sequence名称
      */
     public  static String getSequenceName(Class clazz){
-        Field field=getIdColumn(clazz);
-        Sequence annotation=field.getAnnotation(Sequence.class);
+        Method idGetMethod=getIdMethod(clazz);
+        Sequence annotation=idGetMethod.getAnnotation(Sequence.class);
         if (annotation==null)
             return null;
         return annotation.sequencename();
@@ -114,32 +116,34 @@ public class ClassUtils {
         if(CommonJdbcDaoImpl.databaseProductName.equalsIgnoreCase("MySQL"))
             return null;
         String sequenceName=getSequenceName(clazz);
+        if (sequenceName==null) return null;
+        else
         return CommonJdbcUtils.getSequence(sequenceName);
     }
+
     /**
      * 获取Id属性
      */
-    public  static Field getIdColumn(Class clazz){
-        Field[] fields=clazz.getDeclaredFields();
+    public  static Method getIdMethod(Class clazz){
+        Method[] methods=clazz.getDeclaredMethods();
         Annotation annotation;
-        Field field=null;
+        Method method=null;
         int i=0;
-        for (Field field1:fields){
-            if (field1.getAnnotation(Id.class)!=null) {
+        for (Method m:methods){
+            if (m.getAnnotation(Id.class)!=null&&m.getName().startsWith("get")) {
                 i++;
-                field=field1;
+                method=m;
             };
         }
-       if (i==0) {
-           logger.error("class"+clazz.getName()+"不存在Id属性");
-           throw new RuntimeException("class"+clazz.getName()+"不存在Id属性");
-       }else if (i>1){
-           logger.error("class"+clazz.getName()+"存在多个Id属性");
-           throw new RuntimeException("class"+clazz.getName()+"存在多个Id属性");
-       }
-       return field;
+        if (i==0) {
+            logger.error("class"+clazz.getName()+"不存在Id属性");
+            throw new RuntimeException("class"+clazz.getName()+"不存在Id属性");
+        }else if (i>1){
+            logger.error("class"+clazz.getName()+"存在多个Id属性");
+            throw new RuntimeException("class"+clazz.getName()+"存在多个Id属性");
+        }
+        return method;
     }
-
     /**
      * 获取一个sql生成器
      * @param object
@@ -148,7 +152,7 @@ public class ClassUtils {
      */
     public static  SqlCreator getSqlCreator(Object object,boolean isIncludeNull){
         Class clazz=object.getClass();
-        return  new SqlCreator(getTableName(clazz),getIdColumn(clazz).getName(),
+        return  new SqlCreator(getTableName(clazz),getIdMethod(clazz).getName().substring(3),
                 getAllColumn(object),isIncludeNull);
     }
 
@@ -178,7 +182,7 @@ public class ClassUtils {
                     ps.setTimestamp(i++,(java.sql.Timestamp)object);
                 }else if(c.equals(java.util.Date.class)){
                     java.util.Date date=(java.util.Date)object;
-                    ps.setDate(i++,new java.sql.Date(date.getTime()));
+                    ps.setTimestamp(i++,new java.sql.Timestamp(date.getTime()));
                 }else if(c.equals(BigDecimal.class)){
                     ps.setBigDecimal(i++,(BigDecimal)object);
                 }else if(c.equals(int.class)||c.equals(Integer.class)){
@@ -216,11 +220,11 @@ public class ClassUtils {
      * @param idValue
      */
     public static void setIDValue(Object object,Long idValue){
-        Field idField=getIdColumn(object.getClass());
-        Method method= getSetMethod(object.getClass(),idField);
+        Method idGetMethod=getIdMethod(object.getClass());
+        Method method= getSetMethod(object.getClass(),idGetMethod);
         try {
-            if (idField.getType().equals(Long.class))
-                method.invoke(object,idField)  ;
+            if (idGetMethod.getReturnType().equals(Long.class))
+                method.invoke(object,idValue)  ;
             else
                 method.invoke(object,idValue.intValue())  ;
         } catch (IllegalAccessException e) {
@@ -231,15 +235,17 @@ public class ClassUtils {
     }
 
     /**
-     *
+     * 根据get方法获取set方法
+     * @param clazz
+     * @param getMethod
      * @return
      */
-    public static  Method getSetMethod(Class clazz,Field field) {
-        String fieldName=field.getName();
+    public static  Method getSetMethod(Class clazz,Method getMethod) {
+        String setMethodName="s"+getMethod.getName().substring(1);
         Method method=null;
         try {
-            method=  clazz.getDeclaredMethod("set"+fieldName.substring(0,1).toUpperCase()+fieldName.substring(1)
-                    ,new Class[]{field.getType()});
+            method=  clazz.getDeclaredMethod(setMethodName
+                    ,new Class[]{getMethod.getReturnType()});
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
         }

@@ -1,18 +1,17 @@
 package com.wondersgroup.framwork.dao.bo;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class SqlCreator {
     private String sql;
     private String tableName;//表名
     private String idFileName;//主健字段名称
-    private List<ColumnType> columnTypeList;//字段列表
+    private Map<String,Object> columnTypeList;//字段列表
     private boolean isIncludeNull;//是否处理空值
     private List<Object> args;
 
-    public SqlCreator(String tableName, String idFileName, List<ColumnType> columnTypeList, boolean isIncludeNull) {
+    public SqlCreator(String tableName, String idFileName, Map<String,Object> columnTypeList, boolean isIncludeNull) {
         this.tableName = tableName;
         this.idFileName = idFileName;
         this.columnTypeList = columnTypeList;
@@ -51,11 +50,11 @@ public class SqlCreator {
         this.idFileName = idFileName;
     }
 
-    public List<ColumnType> getColumnTypeList() {
+    public Map<String,Object> getColumnTypeList() {
         return columnTypeList;
     }
 
-    public void setColumnTypeList(List<ColumnType> columnTypeList) {
+    public void setColumnTypeList(Map<String,Object> columnTypeList) {
         this.columnTypeList = columnTypeList;
     }
 
@@ -75,25 +74,31 @@ public class SqlCreator {
             StringBuffer update=new StringBuffer("UPDATE ");
             StringBuffer where=new StringBuffer(" WHERE ");
             this.args=new ArrayList<Object>();
-            Object idVaue=null;
+            Object idValue=null;
             update.append(this.tableName).append(" SET ");
             int i=0;
-            for (ColumnType columnType:this.columnTypeList){
-                if (this.isIncludeNull==false&&columnType.getValue()==null) continue;
-                if (columnType.getColumnName().equalsIgnoreCase(this.idFileName)){
-                    where.append(columnType.getColumnName()+" =? ");
-                    idVaue=columnType.getValue();
+            Set<Map.Entry<String,Object>> sets= columnTypeList.entrySet();
+            Iterator<Map.Entry<String,Object>> iters=sets.iterator();
+            while (iters.hasNext()){
+                Map.Entry<String,Object> iter=iters.next();
+                if (this.isIncludeNull==false&&iter.getValue()==null) continue;
+                if (iter.getKey().equalsIgnoreCase(this.idFileName)){
+                    where.append(iter.getKey()+" =? ");
+                    idValue=iter.getValue();
                     continue;
                 }
                 if(i>0)
-                    update.append(",").append(columnType.getColumnName()+"=? ");
+                    update.append(",").append(iter.getKey()+"=? ");
                 else
-                    update.append(columnType.getColumnName()+"=?" );
-                this.args.add(columnType.getValue());
+                    update.append(iter.getKey()+"=?" );
+                this.args.add(iter.getValue());
                 i++;
             }
-            this.args.add(idVaue);
+            this.args.add(idValue);
             this.sql= update.append(where).toString();
+            if (idValue==null)
+                throw  new RuntimeException("sql"+this.sql+"未传入ID值！");
+
     }
 
     /**
@@ -105,17 +110,20 @@ public class SqlCreator {
         this.args=new ArrayList<Object>();
         insert.append(this.tableName).append(" (");
         int i=0;
-        for (ColumnType columnType:this.columnTypeList){
-            if (this.isIncludeNull==false&&columnType.getValue()==null&&
-                    !columnType.getColumnName().equalsIgnoreCase(this.idFileName)) continue;
+        Set<Map.Entry<String,Object>> sets= columnTypeList.entrySet();
+        Iterator<Map.Entry<String,Object>> iters=sets.iterator();
+        while (iters.hasNext()){
+            Map.Entry<String,Object> iter=iters.next();
+            if (this.isIncludeNull==false&&iter.getValue()==null&&
+                    !iter.getKey().equalsIgnoreCase(this.idFileName)) continue;
             if(i>0) {
-                insert.append(",").append(columnType.getColumnName());
+                insert.append(",").append(iter.getKey());
                 values.append(",?");
             }else {
-                insert.append(columnType.getColumnName());
+                insert.append(iter.getKey());
                 values.append("?");
             }
-            this.args.add(columnType.getValue());
+            this.args.add(iter.getValue());
             i++;
         }
         this.sql= insert.append(")").append(values).append(")").toString();
