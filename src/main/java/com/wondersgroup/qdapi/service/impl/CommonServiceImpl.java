@@ -6,6 +6,8 @@ import com.wondersgroup.qdapi.service.CommonService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class CommonServiceImpl implements CommonService {
     @Autowired
@@ -27,5 +29,13 @@ public class CommonServiceImpl implements CommonService {
      */
     public Ac01VO queryPsnInfo(String aac147, String aac003){
         return this.commonDao.queryPsnInfo(aac147,aac003);
+    }
+    /***
+     * 根据身份证号，姓名查询人员信息
+     * @param aac147
+     * @return
+     */
+    public List<Ac01VO> queryPsnInfo(String aac147){
+        return this.commonDao.queryPsnInfo(aac147);
     }
 }

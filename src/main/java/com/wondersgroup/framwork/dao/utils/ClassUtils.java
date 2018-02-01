@@ -1,13 +1,14 @@
 package com.wondersgroup.framwork.dao.utils;
 
 import com.wondersgroup.framwork.dao.CommonJdbcUtils;
-import com.wondersgroup.framwork.dao.annotation.Id;
-import com.wondersgroup.framwork.dao.annotation.Sequence;
-import com.wondersgroup.framwork.dao.annotation.Table;
+import com.wondersgroup.framwork.dao.annotation.*;
 import com.wondersgroup.framwork.dao.bo.ColumnType;
+import com.wondersgroup.framwork.dao.bo.SpDtoColumn;
 import com.wondersgroup.framwork.dao.bo.SqlCreator;
 import com.wondersgroup.framwork.dao.impl.CommonJdbcDaoImpl;
 import com.wondersgroup.framwork.dao.mapper.ObjectRowMapper;
+import oracle.jdbc.driver.OracleTypes;
+import oracle.jdbc.oracore.OracleType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,7 +98,8 @@ public class ClassUtils {
         return  (table!=null&&table.name()!=null)?table.name():clazz.getName();
     }
     public static Method getSetMethodByFieldName(Class clazz,String fieldName,Class... paramTpes) throws  NoSuchMethodException{
-        return clazz.getDeclaredMethod("set"+fieldName.substring(3),paramTpes);
+        return clazz.getDeclaredMethod("set"+fieldName.substring(0,1).toUpperCase()+fieldName.substring(1)
+                ,paramTpes);
     }
     /**
      * 获取主键sequence名称
@@ -164,53 +166,7 @@ public class ClassUtils {
     public  static void prepareStatement(PreparedStatement ps,List<Object> args){
         int i=1;
         for (Object object:args){
-            try {
-                if (object==null){
-                    ps.setObject(i++,null);
-                    continue;
-                }
-                Class c=object.getClass();
-                if(c.equals(Blob.class)){//如果接收参数是blob类型
-                    ps.setBlob(i++,(Blob)object);
-                }else if(c.equals(Clob.class)){
-                    ps.setClob(i++,(Clob)object);
-                }else if(c.equals(java.sql.Time.class)){
-                    ps.setTime(i++,(Time) object);
-                }else if(c.equals(java.sql.Date.class)){
-                    ps.setDate(i++,(Date) object);
-                }else if(c.equals(java.sql.Timestamp.class)){
-                    ps.setTimestamp(i++,(java.sql.Timestamp)object);
-                }else if(c.equals(java.util.Date.class)){
-                    java.util.Date date=(java.util.Date)object;
-                    ps.setTimestamp(i++,new java.sql.Timestamp(date.getTime()));
-                }else if(c.equals(BigDecimal.class)){
-                    ps.setBigDecimal(i++,(BigDecimal)object);
-                }else if(c.equals(int.class)||c.equals(Integer.class)){
-                    ps.setInt(i++,(Integer) object);
-                    //long
-                }else if(c.equals(long.class)||c.equals(Long.class)){
-                    ps.setLong(i++,(Long) object);
-                    //short
-                }else if(c.equals(short.class)||c.equals(Short.class)){
-                    ps.setShort(i++,(Short) object);
-                    //float
-                }else if(c.equals(float.class)||c.equals(Float.class)){
-                    ps.setFloat(i++,(Float) object);
-                    //double
-                }else if(c.equals(double.class)||c.equals(Double.class)){
-                    ps.setDouble(i++,(Double) object);
-                    //String
-                }else if(c.equals(String.class)){
-                    ps.setString(i++,(String) object);
-                    //boolean
-                }else if(c.equals(Boolean.class)){
-                    ps.setBoolean(i++,(Boolean) object);
-                }else {
-                    throw  new RuntimeException("无效的列类型"+c.getClass().getName());
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
+            sqlTypeConverter(ps,i++,object);
         }
     }
 
@@ -250,5 +206,163 @@ public class ClassUtils {
             e.printStackTrace();
         }
         return method;
+    }
+
+    /**
+     * 调用过程对象生成
+     * @param spObj
+     * @return
+     */
+    public static   Map<Integer,SpDtoColumn> generateSpDto(Object spObj){
+        Class clazz=spObj.getClass();
+        Callable annotation=(Callable) clazz.getAnnotation(Callable.class);
+        if (annotation==null) throw  new RuntimeException("对象非Sp对象");
+        Map<Integer,SpDtoColumn> map=new HashMap<Integer,SpDtoColumn>();
+        Field[] fields=clazz.getDeclaredFields();
+        SpDtoColumn spDtoColumn=null;
+        for (Field field:fields){
+            Annotation[] annotations= field.getAnnotations();
+            if (annotations.length==0) throw  new RuntimeException("列"+field.getName()+"未添加注解");
+            spDtoColumn=new SpDtoColumn();
+
+            spDtoColumn.setName(field.getName());
+            spDtoColumn.setSpName(annotation.name());
+            spDtoColumn.setType(field.getType());
+
+            InOrOut inOrOut=(InOrOut)annotations[0];
+            spDtoColumn.setInOrOut(inOrOut.type());
+            spDtoColumn.setOrder(inOrOut.order());
+            if (inOrOut.type()==SpParamType.IN){
+
+                try {
+                    spDtoColumn.setValue(getGetMethod(clazz,field).invoke(spObj));
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                } catch (InvocationTargetException e) {
+                    e.printStackTrace();
+                }
+            }
+            map.put(inOrOut.order(),spDtoColumn);
+        }
+        return map;
+    }
+
+    /**
+     * 根据field获取method
+     * @param clazz
+     * @param field
+     * @return
+     */
+    public static Method getGetMethod(Class clazz,Field field){
+        Method[] methods=clazz.getDeclaredMethods();
+        for (Method method:methods){
+            if (method.getReturnType()==field.getType()&&
+                    method.getName().substring(3).equalsIgnoreCase(field.getName()))
+                return method;
+        }
+        return null;
+    }
+
+
+    /**
+     * java，sql类型转换
+     * @param ps
+     * @param i
+     * @param object
+     */
+    public static void sqlTypeConverter(PreparedStatement ps,int i,Object object){
+            try {
+                if (object==null){
+                    ps.setObject(i,null);
+                    return;
+                }
+                Class c=object.getClass();
+                if(c.equals(Blob.class)){//如果接收参数是blob类型
+                    ps.setBlob(i,(Blob)object);
+                }else if(c.equals(Clob.class)){
+                    ps.setClob(i,(Clob)object);
+                }else if(c.equals(java.sql.Time.class)){
+                    ps.setTime(i,(Time) object);
+                }else if(c.equals(java.sql.Date.class)){
+                    ps.setDate(i,(Date) object);
+                }else if(c.equals(java.sql.Timestamp.class)){
+                    ps.setTimestamp(i,(java.sql.Timestamp)object);
+                }else if(c.equals(java.util.Date.class)){
+                    java.util.Date date=(java.util.Date)object;
+                    ps.setTimestamp(i,new java.sql.Timestamp(date.getTime()));
+                }else if(c.equals(BigDecimal.class)){
+                    ps.setBigDecimal(i,(BigDecimal)object);
+                }else if(c.equals(int.class)||c.equals(Integer.class)){
+                    ps.setInt(i,(Integer) object);
+                    //long
+                }else if(c.equals(long.class)||c.equals(Long.class)){
+                    ps.setLong(i,(Long) object);
+                    //short
+                }else if(c.equals(short.class)||c.equals(Short.class)){
+                    ps.setShort(i,(Short) object);
+                    //float
+                }else if(c.equals(float.class)||c.equals(Float.class)){
+                    ps.setFloat(i,(Float) object);
+                    //double
+                }else if(c.equals(double.class)||c.equals(Double.class)){
+                    ps.setDouble(i,(Double) object);
+                    //String
+                }else if(c.equals(String.class)){
+                    ps.setString(i,(String) object);
+                    //boolean
+                }else if(c.equals(Boolean.class)){
+                    ps.setBoolean(i,(Boolean) object);
+                }else {
+                    throw  new RuntimeException("无效的列类型"+c.getClass().getName());
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+    }
+
+    /**
+     * java，sql类型转换
+     * @param cs
+     * @param i
+     * @param c
+     */
+    public static void sqlTypeOutConverter(CallableStatement cs,int i,Class c){
+        try {
+            if(c.equals(int.class)||c.equals(Integer.class)){
+                cs.registerOutParameter(i, OracleTypes.NUMBER);
+                //long
+            }else if(c.equals(long.class)||c.equals(Long.class)){
+                cs.registerOutParameter(i, OracleTypes.NUMBER);
+                //short
+            }else if(c.equals(short.class)||c.equals(Short.class)){
+                cs.registerOutParameter(i, OracleTypes.NUMBER);
+                //float
+            }else if(c.equals(float.class)||c.equals(Float.class)){
+                cs.registerOutParameter(i, OracleTypes.NUMBER);
+                //double
+            }else if(c.equals(double.class)||c.equals(Double.class)){
+                cs.registerOutParameter(i, OracleTypes.NUMBER);
+                //String
+            }else if(c.equals(String.class)){
+                cs.registerOutParameter(i, OracleTypes.VARCHAR);
+                //CURSOR
+            }else if(c.equals(List.class)){
+                cs.registerOutParameter(i,  OracleTypes.CURSOR);
+                //boolean
+            }else {
+                throw  new RuntimeException("无效的列类型"+c.getName());
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    /**
+     * java，sql类型转换
+     * @param cs
+     * @param i
+     * @param object
+     */
+    public static void sqlTypeOutConverter(CallableStatement cs,int i,Object object){
+        sqlTypeOutConverter(cs,i,object.getClass());
     }
 }

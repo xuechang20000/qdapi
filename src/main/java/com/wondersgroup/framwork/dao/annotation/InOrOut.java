@@ -8,6 +8,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
 
-public @interface Out {
+public @interface InOrOut {
 	public int order();
+	public SpParamType type();
 }

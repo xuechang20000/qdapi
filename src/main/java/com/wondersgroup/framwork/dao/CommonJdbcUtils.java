@@ -161,4 +161,12 @@ public class CommonJdbcUtils {
     public int execute(String sql,Object...args){
         return commonJdbcDao.execute(sql,args);
     }
+    /**
+     * 调用存储过程
+     * @param spObj
+     * @param spName
+     */
+    public  static void  callProcedure(Object spObj,String ...spName){
+        commonJdbcDao.callProcedure(spObj,spName);
+    }
 }

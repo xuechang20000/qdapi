@@ -6,12 +6,15 @@ import com.wondersgroup.framwork.dao.bo.Page;
 import com.wondersgroup.framwork.dao.bo.SqlCreator;
 import com.wondersgroup.framwork.dao.mapper.ObjectRowMapper;
 import com.wondersgroup.framwork.dao.mapper.SimpleBatchPreparedStatementSetter;
+import com.wondersgroup.framwork.dao.mapper.SimpleCallableStatementCallback;
 import com.wondersgroup.framwork.dao.utils.ClassUtils;
 import com.wondersgroup.framwork.dao.utils.SqlPageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.BatchPreparedStatementSetter;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.CallableStatementCallback;
+import org.springframework.jdbc.core.CallableStatementCreator;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.datasource.DataSourceUtils;
@@ -310,5 +313,17 @@ public class CommonJdbcDaoImpl implements CommonJdbcDao {
      */
     public int execute(String sql,Object...args){
         return  this.jdbcTemplate.update(sql,args);
+    }
+
+    /**
+     * 调用存储过程
+     * @param spObj
+     * @param spName
+     */
+    public  void  callProcedure(Object spObj,String ...spName) {
+
+        SimpleCallableStatementCallback simpleCallableStatementCallback
+                =new SimpleCallableStatementCallback(spName.length>0?spName[0]:null,spObj);
+        this.jdbcTemplate.execute(simpleCallableStatementCallback.getSql(),simpleCallableStatementCallback);
     }
 }

@@ -23,4 +23,5 @@ public interface CommonJdbcDao {
     public void insert(Object object);
     public Long getSequence(String sequenceName);
     public int execute(String sql,Object...args);
+    public  void  callProcedure(Object spObj,String ...spName);
 }

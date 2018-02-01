@@ -22,4 +22,15 @@ public class CommonDapImpl implements CommonDao {
         return  CommonJdbcUtils.queryFirst(sql,Ac01VO.class,aac147,aac003);
         //return ac01VOs.get(0);
     }
+    /***
+     * 根据身份证号，姓名查询人员信息
+     * @param aac147
+     * @return
+     */
+    public List<Ac01VO> queryPsnInfo(String aac147){
+        String sql="select * from ac01 where aac147=? ";
+        //List<Ac01VO> ac01VOs=
+        return  CommonJdbcUtils.queryList(sql,Ac01VO.class,aac147);
+        //return ac01VOs.get(0);
+    }
 }
